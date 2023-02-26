@@ -15,7 +15,7 @@ def arm(master):
     # wait until arming confirmed
     print("Waiting for the vehicle to arm")
     master.motors_armed_wait()
-    print('Armed!')
+    print('!!! Armed !!!')
 
 def disarm(master):
     master.mav.command_long_send(

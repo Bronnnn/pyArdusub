@@ -32,16 +32,20 @@ def create_master(timeout=5):
     return master, boot_time
 
 def recv_match(master, timeout=5, mavpackettype = 'ATTITUDE'):
-    # Get some information !
+    # init timeout
     time_start = default_timer()
+    time_passed = 0
+
     msg = None
-    while (default_timer() - time_start)<timeout:
-        print("waiting")
+
+    while time_passed<timeout:
         try:
             msg = master.recv_match(type=mavpackettype).to_dict()
+            print("received")
             break
         except:
-            pass
+            time_passed = default_timer() - time_start
+            print(f"retry: {(timeout-time_passed):.2f}s until timeout.")
         time.sleep(0.1)
 
     return msg

@@ -10,8 +10,6 @@ def main():
     # create connection from surface computer to autopilot
     examples.Testsequence_SurfaceComputerToAutopilot(useManualControl=False, useSetTargetPosition=True)
 
-
-
 if __name__ == '__main__':
     main()
 

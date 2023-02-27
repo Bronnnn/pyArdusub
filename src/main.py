@@ -5,7 +5,8 @@ from Controller import Commands
 import time
 import pymavlink.mavutil as mavutil
 import ExampleSequences.Testsequence as examples
-
+import ExampleSequences.PymavlinkExamples as pymav_examples
+import ExampleSequences.set_target_depthattitude as set_target_depthattitude
 def main():
     # create connection from surface computer to autopilot
     examples.Testsequence_SurfaceComputerToAutopilot(useManualControl=False, useSetTargetPosition=True)

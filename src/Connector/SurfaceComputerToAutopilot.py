@@ -31,7 +31,7 @@ def create_master(timeout=5):
 
     return master, boot_time
 
-def recv_match(master, timeout=5, mavpackettype = 'ATTITUDE'):
+def recv_match(master, timeout=1, mavpackettype = 'ATTITUDE'):
     # init timeout
     time_start = default_timer()
     time_passed = 0

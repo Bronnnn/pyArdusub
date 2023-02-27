@@ -158,20 +158,11 @@ def connect_external_pressure_sensor():
         print(f"\n")
 
 # Cleaned up version of the playground
-def Testsequence_GroundControlStation_cleaned():
+def Testsequence_SurfaceComputerToAutopilot_w_set_target_position():
         # create connection from surface computer to autopilot
         print("Connecting to autopilot")
         master_SC2AP, boot_time = SC2AP.create_master()
         print(f"\n")
-
-        # request altitude
-        #Commands.request_scaled_pressure(master_SC2AP, param1=141)
-        #msg = SC2AP.recv_match(master_SC2AP, mavpackettype="ALTITUDE")
-        #msg = master_SC2AP.recv_match().to_dict()
-        #print(msg)
-
-        #location = master_SC2AP.location()
-        #print(location)
 
         # clean up (disarm)
         print("Inital state")
@@ -179,8 +170,10 @@ def Testsequence_GroundControlStation_cleaned():
         master_SC2AP.motors_disarmed_wait()
         print(f"\n")
 
+        print("Set depth hold mode")
+        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
 
-        print("!!! Arming. Stay clear !!!")
+        print("\n!!! Arming. Stay clear !!!")
         time_start = default_timer()
         countdown = 5
         while (default_timer()-time_start<countdown):
@@ -196,47 +189,49 @@ def Testsequence_GroundControlStation_cleaned():
         Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=148)
         autopilot_version = SC2AP.recv_match(master_SC2AP, mavpackettype="AUTOPILOT_VERSION")
         print(f"Autopilot version: {autopilot_version}")
-        # check MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT (256), Source: https://mavlink.io/en/messages/common.html#MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT (maybe use pymavlink isntead of hardcoding)
+        # check if autopilot supports commanding position and velocity targets in global scaled integers
+        # Source: https://mavlink.io/en/messages/common.html#MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT (maybe use pymavlink isntead of hardcoding)
         MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT = autopilot_version['capabilities']&256
         print(f"MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT: {MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT==256}")
-
-        print("\nPosition target global int")
-        Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=87)
-        position_target_global_int = SC2AP.recv_match(master_SC2AP, mavpackettype="POSITION_TARGET_GLOBAL_INT")
-        print(f"Position target global int: {position_target_global_int}")
-
-        # set depth hold mode
-        print("set depth hold mode")
-        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
+        MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED = autopilot_version['capabilities']&128
+        print(f"MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED: {MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED==128}")
 
         # init timeout
         time_start = default_timer()
         time_passed = 0
         timeout_s = 15
 
-        # set target depth
-        target_depth_m = -10
-        
         # get current depth
         print("Request 'GLOBAL_POSITION_INT'")
         Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
         global_position_int = SC2AP.recv_match(master_SC2AP, mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
 
         # update depth using one of the many available messages
+        target_depth_m = -10
         current_depth_mm = global_position_int["alt"]
         current_depth_m = current_depth_mm / 1000
         depth_difference_abs_m = abs(target_depth_m - current_depth_m)
 
         print(f"current depth: {current_depth_m:.2f}m")
-        print(f"target depth: {target_depth_m}m")
-        print(f"absolute depth difference: {depth_difference_abs_m:.2f}")
+        print(f"target depth: {target_depth_m:.2f}m")
+        print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
         
         # allowed difference between target depth and current depth
         max_depth_difference_m = 0.2
- 
+
         while time_passed<timeout_s and depth_difference_abs_m>max_depth_difference_m:
-                print(f"set target depth: {target_depth_m}m")
-                Commands.set_target_depth(target_depth_m, master_SC2AP, boot_time) # surface depth shows a different value??? has to be looped in order to have any effect, prefer set surface depth instead???
+                print(f"Set target depth: {target_depth_m}m")
+                Commands.set_target_depth(target_depth_m, master_SC2AP, boot_time) # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+
+                print("Position target global int")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=87)
+                position_target_global_int = master_SC2AP.recv_match(master_SC2AP, type="POSITION_TARGET_GLOBAL_INT")
+                print(f"Position target global int: {position_target_global_int}")
+
+                print("Position target local ned")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=85)
+                position_target_local_ned = master_SC2AP.recv_match(master_SC2AP, type="POSITION_TARGET_LOCAL_NED")
+                print(f"Position target local ned: {position_target_local_ned}")
 
                 # request scaled pressure
                 print("Request 'SCALED_PRESSURE'")
@@ -276,11 +271,6 @@ def Testsequence_GroundControlStation_cleaned():
                 #message = Commands.read_pressure(master=master_SC2AP, num_sensor=1) # thats just the paramter, not the actual measurement!!!
                 #print(f"sensor depth: {sensor.depth()}")
 
-                #print("Position target global int")
-                #Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=87)
-                #position_target_global_int = master_SC2AP.recv_match(master_SC2AP, type="POSITION_TARGET_GLOBAL_INT")
-                #print(position_target_global_int)
-
                 # udpate depth using one of the many messages received
                 current_depth_mm = global_position_int["alt"]
                 current_depth_m = current_depth_mm/1000
@@ -298,16 +288,401 @@ def Testsequence_GroundControlStation_cleaned():
 
         print(f"\n")
 
+        print("sleep 15 seconds")
+        print(time.sleep(10))
+
+        #print("spent 15 seconds in 'set_target_depth' loop")
+        #while(time.sleep(10)==False):
+        #        Commands.set_target_depth(target_depth_m, master_SC2AP,boot_time)  # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+
+        print("set depth hold mode")
+        #Commands.change_flightmode(master_SC2AP, mode='GUIDED') #turns by 90 degrees
+        #Commands.change_flightmode(master_SC2AP, mode='POSHOLD') # does not turn at all
+        Commands.set_target_depth(target_depth_m, master_SC2AP, boot_time)  # workaround to hold depth
+        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
+
         print("rotate")
         # (set target yaw from 0 to 500 degrees in steps of 10, one update per second)
         roll_angle = pitch_angle = 0
-        for yaw_angle in range(0, 360, 10):
-                Commands.set_target_attitude(roll_angle, pitch_angle, yaw_angle, master_SC2AP, boot_time)
-                time.sleep(1)  # wait for a second
+        for yaw_angle in range(0, 360, 60):
+                print("Request 'GLOBAL_POSITION_INT'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+                global_position_int = SC2AP.recv_match(master_SC2AP, mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
 
-        # spin the other way with 3x larger steps (in steps of 10*(-3)=-30, "-" to spin the other way)
-        for yaw_angle in range(360, 0, -30):
+                # udpate depth using one of the many messages received
+                current_depth_mm = global_position_int["alt"]
+                current_depth_m = current_depth_mm / 1000
+                depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+                print(f"current depth: {current_depth_mm / 1000:.2f}m")
+                print(f"target depth: {target_depth_m:.2f}m")
+                print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
                 Commands.set_target_attitude(roll_angle, pitch_angle, yaw_angle, master_SC2AP, boot_time)
+                time.sleep(10)  # wait for a second
+
+        # set depth hold mode
+        print("\nset depth hold mode")
+        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
+
+        # init timeout
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 20
+
+        # set target depth
+        target_depth_m = -0.2
+
+        # get current depth
+        print("Request 'GLOBAL_POSITION_INT'")
+        Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+        global_position_int = SC2AP.recv_match(master_SC2AP, mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+        # update depth using one of the many available messages
+        current_depth_mm = global_position_int["alt"]
+        current_depth_m = current_depth_mm / 1000
+        depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+        print(f"current depth: {current_depth_m:.2f}m")
+        print(f"target depth: {target_depth_m:.2f}m")
+        print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+        # allowed difference between target depth and current depth
+        max_depth_difference_m = 0.2
+
+        while time_passed < timeout_s and depth_difference_abs_m > max_depth_difference_m:
+                print(f"set target depth: {target_depth_m}m")
+                Commands.set_target_depth(target_depth_m, master_SC2AP, boot_time)  # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+
+                print("Position target global int")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=87)
+                position_target_global_int = master_SC2AP.recv_match(master_SC2AP,
+                                                                     type="POSITION_TARGET_GLOBAL_INT")
+                print(f"Position target global int: {position_target_global_int}")
+
+                # request scaled pressure
+                print("Request 'SCALED_PRESSURE'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=29)
+                scaled_pressure1 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE")
+                # Convert to depth #calculates wrong depth
+                # depth = Commands.convert_pressure_to_depth(scaled_pressure1['press_abs']/1000, watertype='salt')
+                # print(f"calculated depth: {depth}")
+
+                print("Request 'SCALED_PRESSURE2'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=137)
+                scaled_pressure2 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE2")
+
+                print("Request 'SCALED_PRESSURE3'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=143)
+                scaled_pressure3 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE3")
+
+                print("Request 'GLOBAL_POSITION_INT'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+                global_position_int = SC2AP.recv_match(master_SC2AP,
+                                                       mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+                # Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=62)
+                # nav_controller_output = SC2AP.recv_match(master_SC2AP, mavpackettype="NAV_CONTROLLER_OUTPUT")
+
+                # Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=63)
+                # global_position_int_cov = SC2AP.recv_match(master_SC2AP, mavpackettype="GLOBAL_POSITION_INT_COV")
+
+                print("Request 'VFR_HUD'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=74)
+                vfr_hud = SC2AP.recv_match(master_SC2AP,
+                                           mavpackettype="VFR_HUD")  # thats even exactly what is displayed in QGC
+
+                # Commands.request_scaled_pressure(master_SC2AP, param1=230)
+                # msg = SC2AP.recv_match(master_SC2AP, mavpackettype="ESTIMATOR_STATUS") # not receiving
+                # print(msg)
+
+                # Print received parameter value (does not ensure that the next message is actually the pressure...)
+                # message = Commands.read_pressure(master=master_SC2AP, num_sensor=1) # thats just the paramter, not the actual measurement!!!
+                # print(f"sensor depth: {sensor.depth()}")
+
+                # udpate depth using one of the many messages received
+                current_depth_mm = global_position_int["alt"]
+                current_depth_m = current_depth_mm / 1000
+                depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+                print(f"current depth: {current_depth_mm / 1000:.2f}m")
+                print(f"target depth: {target_depth_m:.2f}m")
+                print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+                # print the time left for reaching the target depth, before starting to rotate
+                time_passed = default_timer() - time_start
+                print(f"Get to target depth: {(timeout_s - time_passed):.2f}s until timeout.")
+                print("\n")
+                time.sleep(1)
+
+        # clean up (disarm) at the end
+        master_SC2AP.arducopter_disarm()
+        master_SC2AP.motors_disarmed_wait()
+
+
+# Cleaned up version of the playground
+def Testsequence_SurfaceComputerToAutopilot_w_manual_control():
+        # create connection from surface computer to autopilot
+        print("Connecting to autopilot")
+        master_SC2AP, boot_time = SC2AP.create_master()
+        print(f"\n")
+
+        # clean up (disarm)
+        print("Inital state")
+        Commands.disarm(master_SC2AP)
+        master_SC2AP.motors_disarmed_wait()
+        print(f"\n")
+
+        print("Set depth hold mode")
+        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
+
+        print("\n!!! Arming. Stay clear !!!")
+        time_start = default_timer()
+        countdown = 5
+        while (default_timer() - time_start < countdown):
+                print(round(countdown - (default_timer() - time_start)))
+                time.sleep(1)
+        # arm ardusub
+        Commands.arm(master_SC2AP)
+        master_SC2AP.motors_armed_wait()
+        print(f"\n")
+
+        # get autopilot version and capabilities
+        print("Request 'AUTOPILOT_VERSION'")
+        Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=148)
+        autopilot_version = SC2AP.recv_match(master_SC2AP, mavpackettype="AUTOPILOT_VERSION")
+        print(f"Autopilot version: {autopilot_version}")
+        # check if autopilot supports commanding position and velocity targets in global scaled integers
+        # Source: https://mavlink.io/en/messages/common.html#MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT (maybe use pymavlink isntead of hardcoding)
+        MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT = autopilot_version['capabilities'] & 256
+        print(f"MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT: {MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_GLOBAL_INT == 256}")
+        MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED = autopilot_version['capabilities'] & 128
+        print(f"MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED: {MAV_PROTOCOL_CAPABILITY_SET_POSITION_TARGET_LOCAL_NED == 128}")
+
+        # init timeout
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 15
+
+        # get current depth
+        print("Request 'GLOBAL_POSITION_INT'")
+        Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+        global_position_int = SC2AP.recv_match(master_SC2AP,
+                                               mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+        # update depth using one of the many available messages
+        target_depth_m = -10
+        current_depth_mm = global_position_int["alt"]
+        current_depth_m = current_depth_mm / 1000
+        depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+        print(f"current depth: {current_depth_m:.2f}m")
+        print(f"target depth: {target_depth_m:.2f}m")
+        print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+        # allowed difference between target depth and current depth
+        max_depth_difference_m = 0.2
+
+        while time_passed < timeout_s and depth_difference_abs_m > max_depth_difference_m:
+                print(f"Set target depth: {target_depth_m}m")
+                Commands.set_target_depth(target_depth_m, master_SC2AP,
+                                          boot_time)  # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+
+                print("Position target global int")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=87)
+                position_target_global_int = master_SC2AP.recv_match(master_SC2AP, type="POSITION_TARGET_GLOBAL_INT")
+                print(f"Position target global int: {position_target_global_int}")
+
+                print("Position target local ned")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=85)
+                position_target_local_ned = master_SC2AP.recv_match(master_SC2AP, type="POSITION_TARGET_LOCAL_NED")
+                print(f"Position target local ned: {position_target_local_ned}")
+
+                # request scaled pressure
+                print("Request 'SCALED_PRESSURE'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=29)
+                scaled_pressure1 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE")
+                # Convert to depth #calculates wrong depth
+                # depth = Commands.convert_pressure_to_depth(scaled_pressure1['press_abs']/1000, watertype='salt')
+                # print(f"calculated depth: {depth}")
+
+                print("Request 'SCALED_PRESSURE2'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=137)
+                scaled_pressure2 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE2")
+
+                print("Request 'SCALED_PRESSURE3'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=143)
+                scaled_pressure3 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE3")
+
+                print("Request 'GLOBAL_POSITION_INT'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+                global_position_int = SC2AP.recv_match(master_SC2AP,
+                                                       mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+                # Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=62)
+                # nav_controller_output = SC2AP.recv_match(master_SC2AP, mavpackettype="NAV_CONTROLLER_OUTPUT")
+
+                # Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=63)
+                # global_position_int_cov = SC2AP.recv_match(master_SC2AP, mavpackettype="GLOBAL_POSITION_INT_COV")
+
+                print("Request 'VFR_HUD'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=74)
+                vfr_hud = SC2AP.recv_match(master_SC2AP,
+                                           mavpackettype="VFR_HUD")  # thats even exactly what is displayed in QGC
+
+                # Commands.request_scaled_pressure(master_SC2AP, param1=230)
+                # msg = SC2AP.recv_match(master_SC2AP, mavpackettype="ESTIMATOR_STATUS") # not receiving
+                # print(msg)
+
+                # Print received parameter value (does not ensure that the next message is actually the pressure...)
+                # message = Commands.read_pressure(master=master_SC2AP, num_sensor=1) # thats just the paramter, not the actual measurement!!!
+                # print(f"sensor depth: {sensor.depth()}")
+
+                # udpate depth using one of the many messages received
+                current_depth_mm = global_position_int["alt"]
+                current_depth_m = current_depth_mm / 1000
+                depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+                print(f"current depth: {current_depth_mm / 1000:.2f}m")
+                print(f"target depth: {target_depth_m:.2f}m")
+                print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+                # print the time left for reaching the target depth, before starting to rotate
+                time_passed = default_timer() - time_start
+                print(f"Get to target depth: {(timeout_s - time_passed):.2f}s until timeout.")
+                print("\n")
+                time.sleep(1)
+
+        print(f"\n")
+
+        print("sleep 15 seconds")
+        print(time.sleep(10))
+
+        # print("spent 15 seconds in 'set_target_depth' loop")
+        # while(time.sleep(10)==False):
+        #        Commands.set_target_depth(target_depth_m, master_SC2AP,boot_time)  # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+
+        print("set depth hold mode")
+        # Commands.change_flightmode(master_SC2AP, mode='GUIDED') #turns by 90 degrees
+        # Commands.change_flightmode(master_SC2AP, mode='POSHOLD') # does not turn at all
+        Commands.set_target_depth(target_depth_m, master_SC2AP, boot_time)  # workaround to hold depth
+        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
+
+        print("rotate")
+        # (set target yaw from 0 to 500 degrees in steps of 10, one update per second)
+        roll_angle = pitch_angle = 0
+        for yaw_angle in range(0, 360, 60):
+                print("Request 'GLOBAL_POSITION_INT'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+                global_position_int = SC2AP.recv_match(master_SC2AP,
+                                                       mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+                # udpate depth using one of the many messages received
+                current_depth_mm = global_position_int["alt"]
+                current_depth_m = current_depth_mm / 1000
+                depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+                print(f"current depth: {current_depth_mm / 1000:.2f}m")
+                print(f"target depth: {target_depth_m:.2f}m")
+                print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+                Commands.set_target_attitude(roll_angle, pitch_angle, yaw_angle, master_SC2AP, boot_time)
+                time.sleep(10)  # wait for a second
+
+        # set depth hold mode
+        print("\nset depth hold mode")
+        Commands.change_flightmode(master_SC2AP, mode='ALT_HOLD')
+
+        # init timeout
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 20
+
+        # set target depth
+        target_depth_m = -0.2
+
+        # get current depth
+        print("Request 'GLOBAL_POSITION_INT'")
+        Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+        global_position_int = SC2AP.recv_match(master_SC2AP,
+                                               mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+        # update depth using one of the many available messages
+        current_depth_mm = global_position_int["alt"]
+        current_depth_m = current_depth_mm / 1000
+        depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+        print(f"current depth: {current_depth_m:.2f}m")
+        print(f"target depth: {target_depth_m:.2f}m")
+        print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+        # allowed difference between target depth and current depth
+        max_depth_difference_m = 0.2
+
+        while time_passed < timeout_s and depth_difference_abs_m > max_depth_difference_m:
+                print(f"set target depth: {target_depth_m}m")
+                Commands.set_target_depth(target_depth_m, master_SC2AP,
+                                          boot_time)  # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+
+                print("Position target global int")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=87)
+                position_target_global_int = master_SC2AP.recv_match(master_SC2AP,
+                                                                     type="POSITION_TARGET_GLOBAL_INT")
+                print(f"Position target global int: {position_target_global_int}")
+
+                # request scaled pressure
+                print("Request 'SCALED_PRESSURE'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=29)
+                scaled_pressure1 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE")
+                # Convert to depth #calculates wrong depth
+                # depth = Commands.convert_pressure_to_depth(scaled_pressure1['press_abs']/1000, watertype='salt')
+                # print(f"calculated depth: {depth}")
+
+                print("Request 'SCALED_PRESSURE2'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=137)
+                scaled_pressure2 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE2")
+
+                print("Request 'SCALED_PRESSURE3'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=143)
+                scaled_pressure3 = SC2AP.recv_match(master_SC2AP, mavpackettype="SCALED_PRESSURE3")
+
+                print("Request 'GLOBAL_POSITION_INT'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=33)
+                global_position_int = SC2AP.recv_match(master_SC2AP,
+                                                       mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+
+                # Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=62)
+                # nav_controller_output = SC2AP.recv_match(master_SC2AP, mavpackettype="NAV_CONTROLLER_OUTPUT")
+
+                # Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=63)
+                # global_position_int_cov = SC2AP.recv_match(master_SC2AP, mavpackettype="GLOBAL_POSITION_INT_COV")
+
+                print("Request 'VFR_HUD'")
+                Commands.standard_request_msg(master_SC2AP, mavlink_msg_id=74)
+                vfr_hud = SC2AP.recv_match(master_SC2AP,
+                                           mavpackettype="VFR_HUD")  # thats even exactly what is displayed in QGC
+
+                # Commands.request_scaled_pressure(master_SC2AP, param1=230)
+                # msg = SC2AP.recv_match(master_SC2AP, mavpackettype="ESTIMATOR_STATUS") # not receiving
+                # print(msg)
+
+                # Print received parameter value (does not ensure that the next message is actually the pressure...)
+                # message = Commands.read_pressure(master=master_SC2AP, num_sensor=1) # thats just the paramter, not the actual measurement!!!
+                # print(f"sensor depth: {sensor.depth()}")
+
+                # udpate depth using one of the many messages received
+                current_depth_mm = global_position_int["alt"]
+                current_depth_m = current_depth_mm / 1000
+                depth_difference_abs_m = abs(target_depth_m - current_depth_m)
+
+                print(f"current depth: {current_depth_mm / 1000:.2f}m")
+                print(f"target depth: {target_depth_m:.2f}m")
+                print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
+
+                # print the time left for reaching the target depth, before starting to rotate
+                time_passed = default_timer() - time_start
+                print(f"Get to target depth: {(timeout_s - time_passed):.2f}s until timeout.")
+                print("\n")
                 time.sleep(1)
 
         # clean up (disarm) at the end
@@ -318,6 +693,8 @@ def Testsequence(useGroundControlStation = True, useCompanionComputer = False):
     if useGroundControlStation:
         Testsequence_GroundControlStation()
 
-def Testsequence_cleaned(useGroundControlStation=True, useCompanionComputer=False):
-        if useGroundControlStation:
-                Testsequence_GroundControlStation_cleaned()
+def Testsequence_SurfaceComputerToAutopilot(useSetTargetPosition=True, useManualControl=False):
+        if useSetTargetPosition:
+                Testsequence_SurfaceComputerToAutopilot_w_set_target_position()
+        if useManualControl:
+                Testsequence_SurfaceComputerToAutopilot_w_manual_control()

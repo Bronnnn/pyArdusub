@@ -110,6 +110,30 @@ def set_surface_depth(master, depth):
         mavutil.mavlink.MAV_PARAM_TYPE_REAL32
     )
 
+def set_target_depth_ned(depth, master, boot_time):
+    master.mav.set_position_target_local_ned_send(int(1e3 * (time.time() - boot_time)),  # ms since boot
+        master.target_system, master.target_component,
+        coordinate_frame=mavutil.mavlink.MAV_FRAME_GLOBAL_INT,
+        type_mask=(  # ignore everything except z position
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_X_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_Y_IGNORE |
+                # DON'T mavutil.mavlink.POSITION_TARGET_TYPEMASK_Z_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VX_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VY_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_VZ_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AX_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AY_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_AZ_IGNORE |
+                # DON'T mavutil.mavlink.POSITION_TARGET_TYPEMASK_FORCE_SET |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_IGNORE |
+                mavutil.mavlink.POSITION_TARGET_TYPEMASK_YAW_RATE_IGNORE
+        ), x=0, y=0, z=-depth,  # (x, y WGS84 frame pos - not used), z [m]
+        vx=0, vy=0, vz=0,  # velocities in NED frame [m/s] (not used)
+        afx=0, afy=0, afz=0, yaw=0, yaw_rate=0
+        # accelerations in NED frame [N], yaw, yaw_rate
+        #  (all not supported yet, ignored in GCS Mavlink))
+        )
+
 def set_target_depth(depth, master, boot_time):
     """ Sets the target depth while in depth-hold mode.
 

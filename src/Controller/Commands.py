@@ -184,6 +184,37 @@ def set_target_attitude(roll, pitch, yaw, master, boot_time):
         0, 0, 0, 0  # roll rate, pitch rate, yaw rate, thrust
     )
 
+def set_target_attitude_rate(roll, pitch, yaw, roll_rate, pitch_rate, yaw_rate, master, boot_time):
+    """ Sets the target attitude while in depth-hold mode.
+
+        'roll', 'pitch', and 'yaw' are angles in degrees.
+
+        """
+    master.mav.set_attitude_target_send(
+        int(1e3 * (time.time() - boot_time)),  # ms since boot
+        master.target_system, master.target_component,
+        # allow throttle to be controlled by depth_hold mode
+        mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_THROTTLE_IGNORE,
+        # -> attitude quaternion (w, x, y, z | zero-rotation is 1, 0, 0, 0)
+        QuaternionBase([math.radians(angle) for angle in (roll, pitch, yaw)]), #roll, pitch, yaw
+        roll_rate, pitch_rate, yaw_rate, 0  # roll rate, pitch rate, yaw rate, thrust
+    )
+
+def set_target_attitude_rate_2(master, boot_time, yaw_rate):
+    master.mav.set_attitude_target_send(
+        body_yaw_rate=yaw_rate,
+        body_roll_rate=0,
+        body_pitch_rate=0,
+        type_mask=mavutil.mavlink.ATTITUDE_TARGET_TYPEMASK_THROTTLE_IGNORE,
+        time_boot_ms=boot_time,
+        q=QuaternionBase([math.radians(angle) for angle in (0, 0, 0)]), #roll, pitch, yaw,
+        target_system=master.target_system,
+        target_component=master.target_component,
+        thrust=0
+    )
+
+
+
 def request_pressure(master, num_sensor = 1):
     sensor = ('BARO' + str(num_sensor) + '_GND_PRESS').encode('UTF-8')
     print(f"request pressure of: {sensor}")

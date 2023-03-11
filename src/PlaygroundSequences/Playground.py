@@ -101,6 +101,68 @@ def hold_depth(master_SC2AP, boot_time, target_depth_m, timeout_s):
 
         print(f"\n")
 
+def Test_manual_control():
+        print("Testsequence_SurfaceComputerToAutopilot_w_set_target_position")
+        # create connection from surface computer to autopilot
+        print("\nConnecting to autopilot")
+        master_SC2AP, boot_time = SC2AP.create_master()
+        print(f"\n")
+
+        # clean up (disarm)
+        print("Inital state")
+        ArduPilot_Commands.disarm(master_SC2AP)
+        print(f"\n")
+
+        print("Set depth hold mode")
+        # ['STABILIZE', 'ACRO', 'ALT_HOLD', 'AUTO', 'GUIDED', 'CIRCLE', 'SURFACE', 'POSHOLD', 'MANUAL']
+        ArduPilot_Commands.change_flightmode(master_SC2AP, mode='STABILIZE')
+
+        print("\n!!! Arming. Stay clear !!!")
+        time_start = default_timer()
+        countdown = 5
+        while (default_timer() - time_start < countdown):
+                print(round(countdown - (default_timer() - time_start)))
+                time.sleep(1)
+        # arm ardusub
+        ArduPilot_Commands.arm(master_SC2AP)
+        print(f"\n")
+
+        # init timer
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 5
+        print("full speed down")
+        while time_passed<timeout_s:
+                ArduPilot_Commands.manual_control(master_SC2AP, x=0, y=0, z=0, r=0)
+                time_passed = default_timer() - time_start
+
+        # init timer
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 5
+        print("full speed rotating right")
+        while time_passed < timeout_s:
+                ArduPilot_Commands.manual_control(master_SC2AP, x=0, y=100, z=500, r=1000)
+                time_passed = default_timer() - time_start
+        print("full speed forward")
+        # init timer
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 5
+        print("full speed forward")
+        while time_passed < timeout_s:
+                ArduPilot_Commands.manual_control(master_SC2AP, x=1000, y=0, z=500, r=0)
+                time_passed = default_timer() - time_start
+
+        # init timer
+        time_start = default_timer()
+        time_passed = 0
+        timeout_s = 5
+        print("full speed sideways right")
+        while time_passed < timeout_s:
+                ArduPilot_Commands.manual_control(master_SC2AP, x=0, y=1000, z=500, r=0)
+                time_passed = default_timer() - time_start
+
 # Cleaned up version of the playground
 def Testsequence_SurfaceComputerToAutopilot_w_set_target_position():
         print("Testsequence_SurfaceComputerToAutopilot_w_set_target_position")

@@ -34,7 +34,25 @@ def disarm(master):
     master.motors_disarmed_wait()
     print('Disarmed!')
 
+def manual_control(master, x, y, z, r):
+    """
+    Warning: Because of some legacy workaround, z will work between [0-1000]
+    where 0 is full reverse, 500 is no output and 1000 is full throttle.
+    x,y and r will be between [-1000 and 1000].
+    """
+    master.mav.manual_control_send(
+        master.target_system,
+        x=x,
+        y=y,
+        z=z,
+        r=r,
+        buttons=0
+    )
+
 def change_flightmode(master, mode='STABILIZE'):
+    """
+    available modes: ['STABILIZE', 'ACRO', 'ALT_HOLD', 'AUTO', 'GUIDED', 'CIRCLE', 'SURFACE', 'POSHOLD', 'MANUAL']
+    """
     # Check if mode is available
     if mode not in master.mode_mapping():
         print('Unknown mode : {}'.format(mode))

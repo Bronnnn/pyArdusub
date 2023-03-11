@@ -1,6 +1,9 @@
 """
 Example of how to set target depth in depth hold mode with pymavlink
-# https://www.ardusub.com/developers/pymavlink.html#set-target-depthattitude
+https://www.ardusub.com/developers/pymavlink.html#set-target-depthattitude
+
+Corresponding code to the question
+https://discuss.bluerobotics.com/t/vehicle-isnt-executing-target-depth-command-correctly/10539/6
 """
 
 import time

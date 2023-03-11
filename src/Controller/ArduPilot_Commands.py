@@ -4,6 +4,10 @@ import time
 import math
 from pymavlink.quaternion import QuaternionBase
 
+"""
+Uses a couple of examples found on https://www.ardusub.com/developers/pymavlink.html
+Restructures the examples in functions
+"""
 def arm(master):
     master.mav.command_long_send(
         master.target_system,
@@ -67,11 +71,11 @@ def change_flightmode(master, mode='STABILIZE'):
         if ack_msg['command'] == mavutil.mavlink.MAV_CMD_DO_SET_MODE:
             break
 
-def request_depth(master):
+def request_surface_depth_parameter(master):
     # Request parameter
     master.mav.param_request_read_send(
         master.target_system, master.target_component,
-        b'SURFACE_DEPTH', #devid
+        b'SURFACE_DEPTH', #parameter id
         -1
     )
 
@@ -90,7 +94,7 @@ def read_all_parameters(master):
             print(error)
             sys.exit(0)
 
-def get_surface_depth(master):
+def recv_parameter_value(master):
     # Print received parameter value
     print("parameter value:")
     message = master.recv_match(type='PARAM_VALUE', blocking=True).to_dict()
@@ -101,7 +105,7 @@ def get_surface_depth(master):
 
     return message
 
-def set_surface_depth(master, depth):
+def set_surface_depth_parameter(master, depth):
     # Set new parameter value
     master.mav.param_set_send(
         master.target_system, master.target_component,
@@ -111,6 +115,17 @@ def set_surface_depth(master, depth):
     )
 
 def set_target_depth_ned(depth, master, boot_time):
+    """
+    Sets the target depth while in depth-hold mode.
+
+    Uses https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_GLOBAL_INT
+    adjusted for NED frames https://mavlink.io/en/messages/common.html#SET_POSITION_TARGET_LOCAL_NED
+    (note, altitude is negative in NED)
+
+    'depth' is technically an altitude, so set as negative meters below the surface
+        -> set_target_depth(1.5) # sets target to 1.5m below the water surface.
+    """
+
     master.mav.set_position_target_local_ned_send(int(1e3 * (time.time() - boot_time)),  # ms since boot
         master.target_system, master.target_component,
         coordinate_frame=mavutil.mavlink.MAV_FRAME_GLOBAL_INT,
@@ -187,9 +202,9 @@ def set_target_attitude(roll, pitch, yaw, master, boot_time):
 def set_target_attitude_rate(roll, pitch, yaw, roll_rate, pitch_rate, yaw_rate, master, boot_time):
     """ Sets the target attitude while in depth-hold mode.
 
-        'roll', 'pitch', and 'yaw' are angles in degrees.
+    'roll', 'pitch', and 'yaw' are angles in degrees.
 
-        """
+    """
     master.mav.set_attitude_target_send(
         int(1e3 * (time.time() - boot_time)),  # ms since boot
         master.target_system, master.target_component,
@@ -201,6 +216,11 @@ def set_target_attitude_rate(roll, pitch, yaw, roll_rate, pitch_rate, yaw_rate, 
     )
 
 def set_target_attitude_rate_2(master, boot_time, yaw_rate):
+    """ Sets the target attitude while in depth-hold mode.
+
+    'roll', 'pitch', and 'yaw' are angles in degrees.
+
+    """
     master.mav.set_attitude_target_send(
         body_yaw_rate=yaw_rate,
         body_roll_rate=0,
@@ -213,38 +233,10 @@ def set_target_attitude_rate_2(master, boot_time, yaw_rate):
         thrust=0
     )
 
-
-
-def request_pressure(master, num_sensor = 1):
-    sensor = ('BARO' + str(num_sensor) + '_GND_PRESS').encode('UTF-8')
-    print(f"request pressure of: {sensor}")
-
-    master.mav.param_request_read_send(
-        master.target_system, master.target_component,
-        sensor, # thats just a *parameter*, specifically the calibrated ground pressure, not the actual pressure measurement!
-        #b'SCALED_PRESSURE', #not working
-        -1
-    )
-
-def read_pressure(master, num_sensor):
-    # expect answer from sensor with the following id
-    sensor = ('BARO' + str(num_sensor) + '_GND_PRESS').encode('UTF-8')
-
-    # receive message
-    message = master.recv_match(type='PARAM_VALUE', blocking=True).to_dict()
-
-    # check if the message is from the specified sensor
-    print(sensor)
-    print(message['param_id'])
-    #while message['param_id'] != sensor:
-    #    message = master.recv_match(type='PARAM_VALUE', blocking=True).to_dict()
-
-    print('name: %s\tvalue: %d' %
-          (message['param_id'], message['param_value']))
-
-    return message
-
 def convert_pressure_to_depth(pressure, watertype = 'fresh'):
+    """
+    converts pressure to depth using the following formulas https://bluerobotics.com/learn/pressure-depth-calculator/
+    """
     g = 9.80665
     if watertype == 'fresh':
         p_fresh = 997.0474

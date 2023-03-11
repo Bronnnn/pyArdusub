@@ -1,5 +1,5 @@
 from src.Connector import SurfaceComputerToAutopilot as SC2AP
-from src.Controller import Commands
+from src.Controller import ArduPilot_Commands
 import time
 from timeit import default_timer
 from pymavlink import mavutil
@@ -192,7 +192,7 @@ def Testsequence():
 
         # get current depth
         print("\nRequest 'GLOBAL_POSITION_INT'")
-        Commands.standard_request_msg(master, mavlink_msg_id=33)
+        ArduPilot_Commands.standard_request_msg(master, mavlink_msg_id=33)
         global_position_int = recv_match(master, mavpackettype="GLOBAL_POSITION_INT")
 
         # update depth
@@ -221,7 +221,7 @@ def Testsequence():
 
         print("\nRequest 'GLOBAL_POSITION_INT'")
         standard_request_msg(master, mavlink_msg_id=33)
-        global_position_int = SC2AP.recv_match(master, mavpackettype="GLOBAL_POSITION_INT") #could be the correct msg for altitude
+        global_position_int = SC2AP.recv_match(master, mavpackettype="GLOBAL_POSITION_INT")
 
         # udpate depth
         target_depth_m = -10
@@ -247,7 +247,7 @@ def Testsequence():
         # get current depth
         print("\nRequest 'GLOBAL_POSITION_INT'")
         standard_request_msg(master, mavlink_msg_id=33)
-        global_position_int = SC2AP.recv_match(master, mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+        global_position_int = SC2AP.recv_match(master, mavpackettype="GLOBAL_POSITION_INT")
 
         # update depth
         target_depth_m = 0
@@ -263,7 +263,7 @@ def Testsequence():
         time.sleep(10)
 
         print(f"\nset target depth: {target_depth_m}m")
-        set_target_depth(target_depth_m, master, boot_time)  # can not request the target depth??? does not hold the target depth, even if in depth hold mode
+        set_target_depth(target_depth_m, master, boot_time)
 
         print("\nSleep 10 seconds")
         time.sleep(10)
@@ -275,7 +275,7 @@ def Testsequence():
 
         print("Request 'GLOBAL_POSITION_INT'")
         standard_request_msg(master, mavlink_msg_id=33)
-        global_position_int = SC2AP.recv_match(master, mavpackettype="GLOBAL_POSITION_INT")  # could be the correct msg for altitude
+        global_position_int = SC2AP.recv_match(master, mavpackettype="GLOBAL_POSITION_INT")
 
         # udpate depth using one of the many messages received
         current_depth_mm = global_position_int["alt"]

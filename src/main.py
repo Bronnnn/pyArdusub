@@ -3,9 +3,10 @@ import ForumQuestion.Example_DepthHold
 
 
 def main():
-    #pg_seq.Testsequence_SurfaceComputerToAutopilot(useManualControl=False, useSetTargetPosition=True)
+    pg_seq.Testsequence_SurfaceComputerToAutopilot(useManualControl=False, useSetTargetPosition=True)
     #ForumQuestion.Example_DepthHold.run(depth=-10)
-    pg_seq.Test_manual_control()
+    #pg_seq.Test_manual_control()
+    #pg_seq.Testsequence_SurfaceComputerToAutopilot(useManualControl=True, useSetTargetPosition=False)
 
 if __name__ == '__main__':
     main()

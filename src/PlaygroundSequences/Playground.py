@@ -34,7 +34,7 @@ def hold_depth(master_SC2AP, boot_time, target_depth_m, timeout_s):
         print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
 
         # allowed difference between target depth and current depth
-        max_depth_difference_m = 0.2
+        max_depth_difference_m = 0.1
 
         while time_passed < timeout_s and depth_difference_abs_m > max_depth_difference_m:
                 print(f"Set target depth: {target_depth_m}m")
@@ -252,9 +252,9 @@ def Testsequence_SurfaceComputerToAutopilot_w_set_target_position():
                 print(f"absolute depth difference: {depth_difference_abs_m:.2f}m")
 
                 # try to recover the target depth
-                #if depth_difference_abs_m>0.2:
-                #        print("recover depth")
-                #        hold_depth(master_SC2AP, boot_time, target_depth_m, timeout_s)
+                if depth_difference_abs_m>0.2:
+                        print("recover depth")
+                        hold_depth(master_SC2AP, boot_time, target_depth_m, timeout_s)
 
                 #ArduPilot_Commands.set_target_attitude_rate(roll_angle, pitch_angle, yaw_angle, roll_rate=0, pitch_rate=0, yaw_rate=0, master=master_SC2AP, boot_time=boot_time) # does not hold depth
                 ArduPilot_Commands.manual_control(master_SC2AP, x=0, y=100, z=500, r=500) # holds depth
